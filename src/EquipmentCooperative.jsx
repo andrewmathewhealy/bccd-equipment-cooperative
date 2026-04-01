@@ -6,14 +6,15 @@ const DRILL_IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAg
 // To connect to real Google services, replace these placeholder values
 const GOOGLE_FORM_URL = "";
 const GOOGLE_FORM_FIELDS = {
-  name: "", email: "", phone: "", org: "", equipment: "",
+  name: "", email: "", phone: "", org: "", personalAddress: "", equipment: "",
   startDate: "", endDate: "", experience: "", trainingComplete: "",
   fulfillment: "", address: "", benningtonResident: "", purpose: "", estimatedCost: "",
+  certificateOfInsurance: "", seedingRecommendation: "", seedingDepth: "", seedingSize: "", lbPerAcre: "", tractorOperatorPresent: "",
 };
 const GOOGLE_API_KEY = "";
 const GOOGLE_CALENDAR_IDS = { "no-till-drill": "", "bcs-tractor": "" };
 
-const STORAGE_LOCATION = { lat: 42.8781, lng: -73.1968 };
+const STORAGE_LOCATION = { lat: 42.9769, lng: -73.2057 };
 
 const EQUIPMENT = [
   { id: "no-till-drill", name: "No Till Drill", image: DRILL_IMG, requires_training: true,
@@ -103,7 +104,7 @@ function MiniMap({ from, to, distance }) {
   );
 }
 
-function CostBreakdown({ fulfillment, distance, benningtonResident, numDays }) {
+function CostBreakdown({ fulfillment, distance, benningtonResident, numDays, requiresTraining }) {
   const rentalCost = benningtonResident ? 0 : NONRESIDENT_DAILY_RATE * numDays;
   const deliveryFees = fulfillment === "delivery" ? DELIVERY_FEE + PICKUP_FEE : 0;
   const mileage = fulfillment === "delivery" ? distance * COST_PER_MILE * 2 : 0;
@@ -129,13 +130,18 @@ function CostBreakdown({ fulfillment, distance, benningtonResident, numDays }) {
           <div style={{ display: "flex", justifyContent: "space-between" }}><span style={labelS}>Pickup fee (return)</span><span style={valS}>${PICKUP_FEE}</span></div>
           <div style={{ display: "flex", justifyContent: "space-between" }}><span style={labelS}>Mileage (~{distance} mi × ${COST_PER_MILE}/mi × 2 trips)</span><span style={valS}>${mileage}</span></div>
         </>}
+        {requiresTraining && (
+          <div style={{ display: "flex", justifyContent: "space-between" }}><span style={labelS}>Onsite training ($40/hr, ~2 hrs)</span><span style={{ ...valS, color: "var(--amber)" }}>TBD</span></div>
+        )}
         <div style={{ borderTop: "2px solid var(--border)", marginTop: 4, paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700 }}>Estimated Total</span>
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: total === 0 ? "var(--green)" : "var(--accent)" }}>{total === 0 ? "FREE" : `$${total}`}</span>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: total === 0 && !requiresTraining ? "var(--green)" : "var(--accent)" }}>
+            {total === 0 && !requiresTraining ? "FREE" : `$${total}`}{requiresTraining ? " + Training" : ""}
+          </span>
         </div>
       </div>
       <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--muted)", marginTop: 12, lineHeight: 1.5 }}>
-        {fulfillment === "delivery" ? "Mileage is estimated and may be adjusted upon approval." : "Pick up and return at BCCD Equipment Storage in Bennington."}
+        {fulfillment === "delivery" ? "Mileage is estimated and may be adjusted upon approval." : "Pick up and return at 75 Lawrence Rd, Shaftsbury, VT 05262."}
         {total > 0 ? " Payment link will be emailed after your request is approved." : ""}
       </p>
     </div>
@@ -199,9 +205,10 @@ const calBtn = { background: "none", border: "1px solid var(--border)", borderRa
 
 function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
   const [form, setForm] = useState({
-    name: "", email: "", phone: "", org: "", equipment: preselectedEquipment || "",
-    startDate: "", endDate: "", experience: "", trainingComplete: false,
+    name: "", email: "", phone: "", org: "", personalAddress: "", equipment: preselectedEquipment || "",
+    startDate: "", endDate: "", experience: "", trainingComplete: "",
     purpose: "", acknowledgement: false, fulfillment: "pickup", address: "", benningtonResident: false,
+    certificateOfInsurance: false, seedingRecommendation: "", seedingDepth: "", seedingSize: "", lbPerAcre: "", tractorOperatorPresent: false,
   });
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -232,12 +239,13 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
     if (!form.name.trim()) e.name = "Required";
     if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
     if (!form.phone.trim()) e.phone = "Required";
+    if (!form.personalAddress.trim()) e.personalAddress = "Required";
     if (!form.equipment) e.equipment = "Select equipment";
     if (!form.startDate) e.startDate = "Required";
     if (!form.endDate) e.endDate = "Required";
     if (form.startDate && form.endDate && form.endDate < form.startDate) e.endDate = "Must be after start";
-    if (!form.experience) e.experience = "Required";
     if (!form.purpose.trim()) e.purpose = "Required";
+    if (!form.certificateOfInsurance) e.certificateOfInsurance = "Required";
     if (!form.acknowledgement) e.acknowledgement = "Must acknowledge";
     if (form.fulfillment === "delivery" && !form.address.trim()) e.address = "Required for delivery";
     if (form.fulfillment === "delivery" && form.address.trim().length >= 5 && !geo && !geocoding) e.address = "Could not locate — try being more specific";
@@ -275,10 +283,13 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
         </p>
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, maxWidth: 400, margin: "0 auto 24px", textAlign: "left" }}>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Estimated cost</div>
-          <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 32, color: total === 0 ? "var(--green)" : "var(--accent)" }}>{total === 0 ? "FREE" : `$${total}`}</div>
+          <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 32, color: total === 0 && form.trainingComplete !== "requires_onsite" ? "var(--green)" : "var(--accent)" }}>
+            {total === 0 && form.trainingComplete !== "requires_onsite" ? "FREE" : `$${total}`}{form.trainingComplete === "requires_onsite" ? " + Training" : ""}
+          </div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--muted)", marginTop: 6, lineHeight: 1.6 }}>
             {form.benningtonResident ? "Bennington County resident — free rental" : `$${NONRESIDENT_DAILY_RATE}/day × ${numDays} day${numDays > 1 ? "s" : ""} = $${rental}`}
             {form.fulfillment === "delivery" && <><br />Delivery: ${DELIVERY_FEE} drop-off + ${PICKUP_FEE} pickup + ${miles} mileage (~{distance} mi each way)</>}
+            {form.trainingComplete === "requires_onsite" && <><br />Training: $40/hr (typically ~2 hrs)</>}
           </div>
           {total > 0 && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--accent)", marginTop: 10, fontWeight: 500 }}>A Stripe payment link will be emailed once approved.</div>}
         </div>
@@ -300,6 +311,7 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
           <Field label="Phone *" error={errors.phone}><input style={inpStyle} type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="802-555-0000" /></Field>
         </div>
         <Field label="Farm / Organization"><input style={inpStyle} value={form.org} onChange={e => set("org", e.target.value)} placeholder="Optional" /></Field>
+        <Field label="Address *" error={errors.personalAddress}><input style={inpStyle} value={form.personalAddress} onChange={e => set("personalAddress", e.target.value)} placeholder="e.g. 123 Main St, Bennington, VT 05201" /></Field>
         <div style={{ background: form.benningtonResident ? "var(--green-bg)" : "var(--input-bg)", borderRadius: 10, padding: "14px 16px", marginBottom: 4, border: `1px solid ${form.benningtonResident ? "#B7E4C7" : "var(--border)"}`, transition: "all 0.2s" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
             <input type="checkbox" checked={form.benningtonResident} onChange={e => set("benningtonResident", e.target.checked)} style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
@@ -320,22 +332,57 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
         </Field>
         {selEquip?.requires_training && (
           <div style={{ background: "var(--training-bg)", borderRadius: 8, padding: "12px 16px", marginBottom: 16, border: "1px solid var(--training-border)" }}>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--training-text)", lineHeight: 1.5 }}><strong>Training Required:</strong> This equipment requires an in-house training session before rental.</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--training-text)", lineHeight: 1.5 }}><strong>Training Required:</strong> This equipment requires an onsite training session before rental, unless you are an experienced operator of this equipment.</div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={form.trainingComplete} onChange={e => set("trainingComplete", e.target.checked)} />
+              <input type="radio" name="trainingComplete" checked={form.trainingComplete === "completed"} onChange={() => set("trainingComplete", "completed")} />
               <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)" }}>I have already completed training for this equipment</span>
             </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, cursor: "pointer" }}>
+              <input type="radio" name="trainingComplete" checked={form.trainingComplete === "experienced"} onChange={() => set("trainingComplete", "experienced")} />
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)" }}>I am an experienced operator of this equipment</span>
+            </label>
+            <hr style={{ border: "none", borderTop: "1px solid var(--training-border)", margin: "10px 0" }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="radio" name="trainingComplete" checked={form.trainingComplete === "requires_onsite"} onChange={() => set("trainingComplete", "requires_onsite")} />
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)" }}>I require onsite training for this equipment</span>
+            </label>
+            {form.trainingComplete === "requires_onsite" && (
+              <div style={{ background: "var(--amber-bg)", borderRadius: 6, padding: "10px 14px", marginTop: 10, border: "1px solid var(--training-border)" }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--training-text)", lineHeight: 1.6 }}>
+                  Training is billed at <strong>$40/hr</strong>. Sessions typically last around 2 hours, and training is considered complete once you can safely and independently operate the equipment.
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Field label="Start Date *" error={errors.startDate}><input style={inpStyle} type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} /></Field>
           <Field label="End Date *" error={errors.endDate}><input style={inpStyle} type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} /></Field>
         </div>
+        {form.equipment === "no-till-drill" && (
+          <div style={{ background: "var(--input-bg)", borderRadius: 8, padding: "16px", marginTop: 16, border: "1px solid var(--border)" }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Seeding Details</div>
+            <Field label="Seeding Recommendation" error={errors.seedingRecommendation}>
+              <input style={inpStyle} value={form.seedingRecommendation} onChange={e => set("seedingRecommendation", e.target.value)} placeholder="e.g. NRCS or agronomist recommendation" />
+            </Field>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+              <Field label="Depth"><input style={inpStyle} value={form.seedingDepth} onChange={e => set("seedingDepth", e.target.value)} placeholder='e.g. 1/4"' /></Field>
+              <Field label="Seed Size"><input style={inpStyle} value={form.seedingSize} onChange={e => set("seedingSize", e.target.value)} placeholder="e.g. small, medium" /></Field>
+              <Field label="Lb / Acre"><input style={inpStyle} value={form.lbPerAcre} onChange={e => set("lbPerAcre", e.target.value)} placeholder="e.g. 15" /></Field>
+            </div>
+          </div>
+        )}
+      </fieldset>
+
+      <fieldset style={fsStyle}><legend style={lgStyle}>Purpose</legend>
+        <Field label="Intended Use / Project Description *" error={errors.purpose}>
+          <textarea style={{ ...inpStyle, minHeight: 80, resize: "vertical" }} value={form.purpose} onChange={e => set("purpose", e.target.value)} placeholder="Briefly describe your project and how you plan to use the equipment..." />
+        </Field>
       </fieldset>
 
       <fieldset style={fsStyle}><legend style={lgStyle}>Pickup or Delivery</legend>
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          {[{ val: "pickup", icon: "\ud83c\udfd7\ufe0f", label: "I'll pick up", desc: "Pick up & return at BCCD in Bennington" },
+          {[{ val: "pickup", icon: "\ud83c\udfd7\ufe0f", label: "I'll pick up", desc: "Pick up & return at 75 Lawrence Rd, Shaftsbury" },
             { val: "delivery", icon: "\ud83d\ude9b", label: "Deliver to me", desc: "$40 delivery + $40 pickup + $1/mile each way" }].map(opt => (
             <button key={opt.val} onClick={() => set("fulfillment", opt.val)} style={{
               flex: 1, padding: "16px 14px", borderRadius: 12, border: `2px solid ${form.fulfillment === opt.val ? "var(--accent)" : "var(--border)"}`,
@@ -354,27 +401,20 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
             {geo && !geocoding && <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--green)", marginTop: 4, display: "block" }}>{"\u2713"} Found — ~{distance} miles from BCCD storage</span>}
           </Field>
           {geo && <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}><MiniMap from={STORAGE_LOCATION} to={geo} distance={distance} /></div>}
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginTop: 8 }}>
+            <input type="checkbox" checked={form.tractorOperatorPresent} onChange={e => set("tractorOperatorPresent", e.target.checked)} style={{ marginTop: 3 }} />
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>A tractor and operator will be present at the time of delivery</span>
+          </label>
         </>}
-        {form.equipment && <CostBreakdown fulfillment={form.fulfillment} distance={distance} benningtonResident={form.benningtonResident} numDays={numDays} />}
-      </fieldset>
-
-      <fieldset style={fsStyle}><legend style={lgStyle}>Experience & Purpose</legend>
-        <Field label="Experience Level *" error={errors.experience}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {[{ val: "none", label: "No experience" }, { val: "some", label: "Some experience" }, { val: "experienced", label: "Experienced operator" }].map(opt => (
-              <button key={opt.val} onClick={() => set("experience", opt.val)} style={{
-                ...chipStyle, background: form.experience === opt.val ? "var(--accent)" : "var(--chip-bg)",
-                color: form.experience === opt.val ? "white" : "var(--text)", borderColor: form.experience === opt.val ? "var(--accent)" : "var(--border)",
-              }}>{opt.label}</button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Intended Use / Project Description *" error={errors.purpose}>
-          <textarea style={{ ...inpStyle, minHeight: 80, resize: "vertical" }} value={form.purpose} onChange={e => set("purpose", e.target.value)} placeholder="Briefly describe your project and how you plan to use the equipment..." />
-        </Field>
+        {form.equipment && <CostBreakdown fulfillment={form.fulfillment} distance={distance} benningtonResident={form.benningtonResident} numDays={numDays} requiresTraining={form.trainingComplete === "requires_onsite"} />}
       </fieldset>
 
       <div style={{ marginBottom: 24 }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 12 }}>
+          <input type="checkbox" checked={form.certificateOfInsurance} onChange={e => set("certificateOfInsurance", e.target.checked)} style={{ marginTop: 3 }} />
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I have a certificate of insurance and can provide it upon request. *</span>
+        </label>
+        {errors.certificateOfInsurance && <span style={errStyle}>{errors.certificateOfInsurance}</span>}
         <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
           <input type="checkbox" checked={form.acknowledgement} onChange={e => set("acknowledgement", e.target.checked)} style={{ marginTop: 3 }} />
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I understand that rental is subject to availability and approval by BCCD staff. I agree to use equipment responsibly and return it in the condition received. A payment link will be emailed after approval. *</span>
