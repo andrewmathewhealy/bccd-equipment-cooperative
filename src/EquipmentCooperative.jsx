@@ -29,23 +29,37 @@ const NONRESIDENT_DAILY_RATE = 65;
 const DELIVERY_FEE = 40;
 const PICKUP_FEE = 40;
 const COST_PER_MILE = 1;
-const ROAD_MULTIPLIER = 1.35;
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
 async function geocodeAddress(address) {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`);
+    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${MAPBOX_TOKEN}&country=us&limit=1`);
     const data = await res.json();
-    if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    if (data.features && data.features.length > 0) {
+      const [lng, lat] = data.features[0].center;
+      return { lat, lng };
+    }
   } catch (e) {}
   return null;
 }
 
-function estimateRoadMiles(lat1, lng1, lat2, lng2) {
-  const R = 3959;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * ROAD_MULTIPLIER);
+async function searchAddresses(query) {
+  if (!query || query.length < 3) return [];
+  try {
+    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=us&types=address&limit=5&proximity=-73.2057,42.9769`);
+    const data = await res.json();
+    return (data.features || []).map(f => ({ label: f.place_name, lat: f.center[1], lng: f.center[0] }));
+  } catch (e) {}
+  return [];
+}
+
+async function getDrivingDistance(lat1, lng1, lat2, lng2) {
+  try {
+    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${lng1},${lat1};${lng2},${lat2}?access_token=${MAPBOX_TOKEN}&overview=false`);
+    const data = await res.json();
+    if (data.routes && data.routes.length > 0) return Math.round(data.routes[0].distance / 1609.34);
+  } catch (e) {}
+  return null;
 }
 
 function useCalendarEvents(equipmentId) {
@@ -216,21 +230,53 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
   const [geo, setGeo] = useState(null);
   const [geocoding, setGeocoding] = useState(false);
   const [distance, setDistance] = useState(0);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [personalSuggestions, setPersonalSuggestions] = useState([]);
+  const [showPersonalSuggestions, setShowPersonalSuggestions] = useState(false);
   const geoTimer = useRef(null);
+  const suggestTimer = useRef(null);
+  const personalSuggestTimer = useRef(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    if (form.fulfillment !== "delivery" || form.address.trim().length < 5) { setGeo(null); setDistance(0); return; }
-    clearTimeout(geoTimer.current);
-    geoTimer.current = setTimeout(async () => {
-      setGeocoding(true);
-      const result = await geocodeAddress(form.address);
-      if (result) { setGeo(result); setDistance(estimateRoadMiles(STORAGE_LOCATION.lat, STORAGE_LOCATION.lng, result.lat, result.lng)); }
-      else { setGeo(null); setDistance(0); }
-      setGeocoding(false);
-    }, 800);
-    return () => clearTimeout(geoTimer.current);
+    if (form.fulfillment !== "delivery" || form.address.trim().length < 3) { setSuggestions([]); return; }
+    clearTimeout(suggestTimer.current);
+    suggestTimer.current = setTimeout(async () => {
+      const results = await searchAddresses(form.address);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    }, 300);
+    return () => clearTimeout(suggestTimer.current);
   }, [form.address, form.fulfillment]);
+
+  useEffect(() => {
+    if (form.personalAddress.trim().length < 3) { setPersonalSuggestions([]); return; }
+    clearTimeout(personalSuggestTimer.current);
+    personalSuggestTimer.current = setTimeout(async () => {
+      const results = await searchAddresses(form.personalAddress);
+      setPersonalSuggestions(results);
+      setShowPersonalSuggestions(results.length > 0);
+    }, 300);
+    return () => clearTimeout(personalSuggestTimer.current);
+  }, [form.personalAddress]);
+
+  const selectPersonalAddress = (suggestion) => {
+    set("personalAddress", suggestion.label);
+    setPersonalSuggestions([]);
+    setShowPersonalSuggestions(false);
+  };
+
+  const selectAddress = async (suggestion) => {
+    set("address", suggestion.label);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setGeocoding(true);
+    setGeo({ lat: suggestion.lat, lng: suggestion.lng });
+    const miles = await getDrivingDistance(STORAGE_LOCATION.lat, STORAGE_LOCATION.lng, suggestion.lat, suggestion.lng);
+    setDistance(miles || 0);
+    setGeocoding(false);
+  };
 
   const numDays = (form.startDate && form.endDate) ? Math.max(1, Math.round((new Date(form.endDate) - new Date(form.startDate)) / 86400000) + 1) : 1;
 
@@ -311,7 +357,21 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
           <Field label="Phone *" error={errors.phone}><input style={inpStyle} type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="802-555-0000" /></Field>
         </div>
         <Field label="Farm / Organization"><input style={inpStyle} value={form.org} onChange={e => set("org", e.target.value)} placeholder="Optional" /></Field>
-        <Field label="Address *" error={errors.personalAddress}><input style={inpStyle} value={form.personalAddress} onChange={e => set("personalAddress", e.target.value)} placeholder="e.g. 123 Main St, Bennington, VT 05201" /></Field>
+        <Field label="Address *" error={errors.personalAddress}>
+          <div style={{ position: "relative" }}>
+            <input style={inpStyle} value={form.personalAddress} onChange={e => set("personalAddress", e.target.value)} onFocus={() => personalSuggestions.length > 0 && setShowPersonalSuggestions(true)} onBlur={() => setTimeout(() => setShowPersonalSuggestions(false), 200)} placeholder="Start typing your address..." autoComplete="off" />
+            {showPersonalSuggestions && personalSuggestions.length > 0 && (
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "0 0 8px 8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, maxHeight: 200, overflow: "auto" }}>
+                {personalSuggestions.map((s, i) => (
+                  <div key={i} onMouseDown={() => selectPersonalAddress(s)} style={{ padding: "10px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", borderBottom: i < personalSuggestions.length - 1 ? "1px solid var(--border)" : "none" }}
+                    onMouseEnter={e => e.target.style.background = "var(--green-bg)"} onMouseLeave={e => e.target.style.background = "transparent"}>
+                    {s.label}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Field>
         <div style={{ background: form.benningtonResident ? "var(--green-bg)" : "var(--input-bg)", borderRadius: 10, padding: "14px 16px", marginBottom: 4, border: `1px solid ${form.benningtonResident ? "#B7E4C7" : "var(--border)"}`, transition: "all 0.2s" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
             <input type="checkbox" checked={form.benningtonResident} onChange={e => set("benningtonResident", e.target.checked)} style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
@@ -382,13 +442,12 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
 
       <fieldset style={fsStyle}><legend style={lgStyle}>Pickup or Delivery</legend>
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          {[{ val: "pickup", icon: "\ud83c\udfd7\ufe0f", label: "I'll pick up", desc: "Pick up & return at 75 Lawrence Rd, Shaftsbury" },
-            { val: "delivery", icon: "\ud83d\ude9b", label: "Deliver to me", desc: "$40 delivery + $40 pickup + $1/mile each way" }].map(opt => (
+          {[{ val: "pickup", label: "I'll pick up", desc: "Pick up & return at 75 Lawrence Rd, Shaftsbury" },
+            { val: "delivery", label: "Deliver to me", desc: "$40 delivery + $40 pickup + $1/mile each way" }].map(opt => (
             <button key={opt.val} onClick={() => set("fulfillment", opt.val)} style={{
               flex: 1, padding: "16px 14px", borderRadius: 12, border: `2px solid ${form.fulfillment === opt.val ? "var(--accent)" : "var(--border)"}`,
               background: form.fulfillment === opt.val ? "var(--green-bg)" : "var(--card-bg)", cursor: "pointer", textAlign: "left", transition: "all 0.2s",
             }}>
-              <div style={{ fontSize: 22, marginBottom: 6 }}>{opt.icon}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{opt.label}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{opt.desc}</div>
             </button>
@@ -396,9 +455,31 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
         </div>
         {form.fulfillment === "delivery" && <>
           <Field label="Farm / Delivery Address *" error={errors.address}>
-            <input style={inpStyle} value={form.address} onChange={e => set("address", e.target.value)} placeholder="e.g. 123 Farm Rd, North Bennington, VT 05257" />
-            {geocoding && <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--muted)", marginTop: 4, display: "block" }}>Looking up address...</span>}
-            {geo && !geocoding && <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--green)", marginTop: 4, display: "block" }}>{"\u2713"} Found — ~{distance} miles from BCCD storage</span>}
+            {form.personalAddress.trim() && form.address !== form.personalAddress && (
+              <button onClick={async () => { set("address", form.personalAddress); setSuggestions([]); setShowSuggestions(false); setGeocoding(true); const result = await geocodeAddress(form.personalAddress); if (result) { setGeo(result); const miles = await getDrivingDistance(STORAGE_LOCATION.lat, STORAGE_LOCATION.lng, result.lat, result.lng); setDistance(miles || 0); } setGeocoding(false); }} style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "var(--green-bg)", border: "1px solid var(--accent)", borderRadius: 6, padding: "6px 12px", cursor: "pointer", marginBottom: 8, display: "inline-block" }}>
+                Same as my address
+              </button>
+            )}
+            <div style={{ position: "relative" }}>
+              <input style={inpStyle} value={form.address} onChange={e => { set("address", e.target.value); setGeo(null); setDistance(0); }} onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} placeholder="Start typing an address..." autoComplete="off" />
+              {showSuggestions && suggestions.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "0 0 8px 8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, maxHeight: 200, overflow: "auto" }}>
+                  {suggestions.map((s, i) => (
+                    <div key={i} onMouseDown={() => selectAddress(s)} style={{ padding: "10px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", borderBottom: i < suggestions.length - 1 ? "1px solid var(--border)" : "none" }}
+                      onMouseEnter={e => e.target.style.background = "var(--green-bg)"} onMouseLeave={e => e.target.style.background = "transparent"}>
+                      {s.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {geocoding && <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--muted)", marginTop: 4, display: "block" }}>Calculating driving distance...</span>}
+            {geo && !geocoding && distance > 0 && <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--green)", marginTop: 4, display: "block" }}>{"\u2713"} Found — ~{distance} miles driving from BCCD storage</span>}
+            {geo && !geocoding && distance > 100 && (
+              <div style={{ background: "var(--amber-bg)", borderRadius: 6, padding: "8px 12px", marginTop: 8, border: "1px solid var(--training-border)" }}>
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--training-text)", lineHeight: 1.5 }}>Your location is over 100 miles away. Delivery fee may be higher, calculated at <strong>$40/hr</strong> for driver time.</span>
+              </div>
+            )}
           </Field>
           {geo && <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}><MiniMap from={STORAGE_LOCATION} to={geo} distance={distance} /></div>}
           <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginTop: 8 }}>
