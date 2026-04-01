@@ -145,12 +145,12 @@ function CostBreakdown({ fulfillment, distance, benningtonResident, numDays, req
           <div style={{ display: "flex", justifyContent: "space-between" }}><span style={labelS}>Mileage (~{distance} mi × ${COST_PER_MILE}/mi × 2 trips)</span><span style={valS}>${mileage}</span></div>
         </>}
         {requiresTraining && (
-          <div style={{ display: "flex", justifyContent: "space-between" }}><span style={labelS}>Onsite training ($40/hr, ~2 hrs)</span><span style={{ ...valS, color: "var(--amber)" }}>TBD</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}><span style={labelS}>Onsite training (estimate)</span><span style={valS}>$80</span></div>
         )}
         <div style={{ borderTop: "2px solid var(--border)", marginTop: 4, paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700 }}>Estimated Total</span>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: total === 0 && !requiresTraining ? "var(--green)" : "var(--accent)" }}>
-            {total === 0 && !requiresTraining ? "FREE" : `$${total}`}{requiresTraining ? " + Training" : ""}
+            {total === 0 && !requiresTraining ? "FREE" : `$${total + (requiresTraining ? 80 : 0)}`}
           </span>
         </div>
       </div>
@@ -240,6 +240,18 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
+    if (form.fulfillment === "delivery" && !form.address.trim() && form.personalAddress.trim()) {
+      set("address", form.personalAddress);
+      (async () => {
+        setGeocoding(true);
+        const result = await geocodeAddress(form.personalAddress);
+        if (result) { setGeo(result); const miles = await getDrivingDistance(STORAGE_LOCATION.lat, STORAGE_LOCATION.lng, result.lat, result.lng); setDistance(miles || 0); }
+        setGeocoding(false);
+      })();
+    }
+  }, [form.fulfillment]);
+
+  useEffect(() => {
     if (form.fulfillment !== "delivery" || form.address.trim().length < 3) { setSuggestions([]); return; }
     clearTimeout(suggestTimer.current);
     suggestTimer.current = setTimeout(async () => {
@@ -261,10 +273,18 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
     return () => clearTimeout(personalSuggestTimer.current);
   }, [form.personalAddress]);
 
-  const selectPersonalAddress = (suggestion) => {
+  const selectPersonalAddress = async (suggestion) => {
     set("personalAddress", suggestion.label);
     setPersonalSuggestions([]);
     setShowPersonalSuggestions(false);
+    set("address", suggestion.label);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setGeocoding(true);
+    setGeo({ lat: suggestion.lat, lng: suggestion.lng });
+    const miles = await getDrivingDistance(STORAGE_LOCATION.lat, STORAGE_LOCATION.lng, suggestion.lat, suggestion.lng);
+    setDistance(miles || 0);
+    setGeocoding(false);
   };
 
   const selectAddress = async (suggestion) => {
@@ -330,12 +350,12 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, maxWidth: 400, margin: "0 auto 24px", textAlign: "left" }}>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Estimated cost</div>
           <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 32, color: total === 0 && form.trainingComplete !== "requires_onsite" ? "var(--green)" : "var(--accent)" }}>
-            {total === 0 && form.trainingComplete !== "requires_onsite" ? "FREE" : `$${total}`}{form.trainingComplete === "requires_onsite" ? " + Training" : ""}
+            {total === 0 && form.trainingComplete !== "requires_onsite" ? "FREE" : `$${total + (form.trainingComplete === "requires_onsite" ? 80 : 0)}`}
           </div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--muted)", marginTop: 6, lineHeight: 1.6 }}>
             {form.benningtonResident ? "Bennington County resident — free rental" : `$${NONRESIDENT_DAILY_RATE}/day × ${numDays} day${numDays > 1 ? "s" : ""} = $${rental}`}
             {form.fulfillment === "delivery" && <><br />Delivery: ${DELIVERY_FEE} drop-off + ${PICKUP_FEE} pickup + ${miles} mileage (~{distance} mi each way)</>}
-            {form.trainingComplete === "requires_onsite" && <><br />Training: $40/hr (typically ~2 hrs)</>}
+            {form.trainingComplete === "requires_onsite" && <><br />Onsite training (estimate): $80</>}
           </div>
           {total > 0 && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--accent)", marginTop: 10, fontWeight: 500 }}>A Stripe payment link will be emailed once approved.</div>}
         </div>
