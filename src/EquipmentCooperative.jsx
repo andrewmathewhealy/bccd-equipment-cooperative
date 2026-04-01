@@ -513,7 +513,7 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
       <div style={{ marginBottom: 24 }}>
         <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 12 }}>
           <input type="checkbox" checked={form.certificateOfInsurance} onChange={e => set("certificateOfInsurance", e.target.checked)} style={{ marginTop: 3 }} />
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I have a certificate of insurance and can provide it upon request. *</span>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I am able to provide a certificate of insurance to operate this equipment. *</span>
         </label>
         {errors.certificateOfInsurance && <span style={errStyle}>{errors.certificateOfInsurance}</span>}
         <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
@@ -568,7 +568,7 @@ export default function EquipmentCooperative() {
         {view === "browse" && (
           <div>
             <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "var(--muted)", lineHeight: 1.7, marginBottom: 32, maxWidth: 660 }}>
-              Browse available equipment below. Check the calendar for open dates, then submit a rental request. <strong style={{ color: "var(--green)" }}>Free for Bennington County residents</strong> — non-residents pay <strong style={{ color: "var(--text)" }}>$65/day</strong>. Delivery available at <strong style={{ color: "var(--text)" }}>$40 each way + $1/mile</strong>.
+              Browse available equipment below. Check the calendar for open dates, then submit a rental request. <strong style={{ color: "var(--green)" }}>Free for Bennington County residents</strong> — non-residents pay <strong style={{ color: "var(--text)" }}>$65/day</strong>.<br />Bennington County residents are prioritized.<br />Delivery available at <strong style={{ color: "var(--text)" }}>$40 each way + $1/mile</strong> for both residents and non-residents.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {EQUIPMENT.map(eq => (
