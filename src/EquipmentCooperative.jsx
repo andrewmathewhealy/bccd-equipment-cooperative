@@ -92,7 +92,10 @@ async function submitToGoogleForm(formData) {
   if (!GOOGLE_FORM_URL) return { success: true, demo: true };
   const params = new URLSearchParams();
   Object.entries(GOOGLE_FORM_FIELDS).forEach(([key, fieldId]) => {
-    if (fieldId && formData[key] !== undefined) params.append(fieldId, String(formData[key]));
+    if (!fieldId || formData[key] === undefined) return;
+    let val = formData[key];
+    if (typeof val === "boolean") val = val ? "Option 1" : "";
+    params.append(fieldId, String(val));
   });
   try {
     await fetch(GOOGLE_FORM_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString() });
