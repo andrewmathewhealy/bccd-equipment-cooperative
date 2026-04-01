@@ -14,7 +14,7 @@ const GOOGLE_FORM_FIELDS = {
   tractorOperatorPresent: "entry.1343796058", benningtonResident: "entry.606670027",
   certificateOfInsurance: "entry.1391078837", estimatedCost: "entry.1105869624",
 };
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || "";
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || "AIzaSyAOrz8fc-KV7HycIFF7JQmX6TviCmAyKIA";
 const GOOGLE_CALENDAR_IDS = {
   "no-till-drill": "3e2343c3444827ced53c296714e533ac91bfac4310888d8eead058bc0b5bbbb8@group.calendar.google.com",
   "bcs-tractor": "4ae427d7e6952676827789d6d137a3a70404a682fd57121cf7cea35d8451a966@group.calendar.google.com",
@@ -35,7 +35,7 @@ const NONRESIDENT_DAILY_RATE = 65;
 const DELIVERY_FEE = 40;
 const PICKUP_FEE = 40;
 const COST_PER_MILE = 1;
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "";
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "pk.eyJ1IjoiYW5kcmV3YmNjZHZ0IiwiYSI6ImNtbmc2dWFnbjA2ZDIybnE1djdoc2h3cWcifQ.4HY9fUsStX-bKiQQueH1cg";
 
 async function geocodeAddress(address) {
   try {
