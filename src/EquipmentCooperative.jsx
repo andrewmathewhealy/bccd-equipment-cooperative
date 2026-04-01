@@ -418,9 +418,10 @@ export default function EquipmentCooperative() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
       <div style={{ background: "var(--accent)", color: "white", padding: "24px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 28, margin: 0, fontWeight: 400 }}>Equipment Cooperative</h1>
-          <p style={{ fontSize: 13, opacity: 0.8, margin: "4px 0 0" }}>Bennington County Conservation District</p>
+          <h1 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 36, margin: 0, fontWeight: 400 }}>Equipment Cooperative</h1>
+          <p style={{ fontSize: 17, opacity: 0.8, margin: "4px 0 0" }}>Bennington County Conservation District</p>
         </div>
+        <img src="/bccd-logo.jpg" alt="Bennington County Conservation District" style={{ height: 120, borderRadius: 6, background: "white", padding: 2 }} />
       </div>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
         {view === "browse" && (
