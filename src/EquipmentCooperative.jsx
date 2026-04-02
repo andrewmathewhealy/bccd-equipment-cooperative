@@ -218,8 +218,7 @@ function EquipmentCalendar({ equipmentId }) {
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 11, fontFamily: "'DM Sans', sans-serif", color: "var(--muted)" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--booked)", display: "inline-block" }} /> Booked</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, border: "2px solid var(--accent)", display: "inline-block" }} /> Today</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--available-dot)", display: "inline-block" }} /> Available</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--card-bg)", border: "1px solid var(--border)", display: "inline-block" }} /> Available</span>
       </div>
     </div>
   );
