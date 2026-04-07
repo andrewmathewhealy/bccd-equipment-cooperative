@@ -25,7 +25,7 @@ const STORAGE_LOCATION = { lat: 42.9769, lng: -73.2057 };
 const EQUIPMENT = [
   { id: "no-till-drill", name: "No Till Drill", image: DRILL_IMG, requires_training: true,
     description: "Plants seeds directly into existing vegetation without disturbing the soil. Ideal for cover cropping, pasture renovation, and conservation seeding.",
-    specs: "Great Plains model · 7' working width · 3-point hitch · Requires 40+ HP tractor" },
+    specs: "Great Plains model 606NT · 6' working width · 3-point hitch · Requires 40+ HP tractor" },
   { id: "bcs-tractor", name: "BCS Walk-Behind Tractor", image: TRACTOR_IMG, requires_training: true,
     description: "Versatile two-wheel tractor for small-scale farm and land-management tasks. Multiple attachments available.",
     specs: "BCS Model 749 · 10 HP diesel · Attachments: tiller, flail mower, sickle bar" }
