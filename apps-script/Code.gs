@@ -367,23 +367,7 @@ function createBookingForRow(sheet, row, col) {
     throw new Error('Row ' + row + ' has an unreadable start or end date.');
   }
 
-  // Tolerant calendar lookup: ignore case and punctuation so
-  // "No-Till Drill" still matches "No Till Drill".
-  var normalize = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
-  var calId = null;
-  Object.keys(CALENDAR_IDS).forEach(function (key) {
-    if (normalize(key) === normalize(equipment)) calId = CALENDAR_IDS[key];
-  });
-  if (!calId) {
-    throw new Error('No calendar is configured for equipment "' + equipment + '". ' +
-      'Check the CALENDAR_IDS list at the top of the script.');
-  }
-
-  var calendar = CalendarApp.getCalendarById(calId);
-  if (!calendar) {
-    throw new Error('Could not open calendar ' + calId + '. ' +
-      'Make sure this Google account has access to it.');
-  }
+  var calendar = getCalendarForEquipment(equipment);
 
   // Google all-day events treat the end date as exclusive, so add
   // a day to make the event span the rental's last day inclusive.
@@ -421,11 +405,66 @@ function createBookingForRow(sheet, row, col) {
   return event;
 }
 
+// Tolerant calendar lookup: ignore case and punctuation so
+// "No-Till Drill" still matches "No Till Drill".
+function getCalendarForEquipment(equipment) {
+  var normalize = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+  var calId = null;
+  Object.keys(CALENDAR_IDS).forEach(function (key) {
+    if (normalize(key) === normalize(equipment)) calId = CALENDAR_IDS[key];
+  });
+  if (!calId) {
+    throw new Error('No calendar is configured for equipment "' + equipment + '". ' +
+      'Check the CALENDAR_IDS list at the top of the script.');
+  }
+  var calendar = CalendarApp.getCalendarById(calId);
+  if (!calendar) {
+    throw new Error('Could not open calendar ' + calId + '. ' +
+      'Make sure this Google account has access to it.');
+  }
+  return calendar;
+}
+
+// Deletes the calendar event recorded for a row (from the Event ID
+// column, or the legacy "Cal Event ID: ..." marker in Notes) and
+// clears the record so the row can be re-approved cleanly.
+function removeBookingForRow(sheet, row, col) {
+  col = col || getHeaderMap(sheet);
+  var eventId = '';
+  if (col.eventId) eventId = String(sheet.getRange(row, col.eventId).getValue()).trim();
+  var fromNotes = false;
+  if (!eventId && col.notes) {
+    var m = String(sheet.getRange(row, col.notes).getValue()).match(/Cal Event ID: ([^\s|]+)/);
+    if (m) { eventId = m[1]; fromNotes = true; }
+  }
+  if (!eventId) return;
+
+  var equipment = col.equipment ? String(sheet.getRange(row, col.equipment).getValue()) : '';
+  var calendar = getCalendarForEquipment(equipment);
+  var event = calendar.getEventById(eventId);
+  if (event) {
+    event.deleteEvent();
+    Logger.log('Removed calendar event for row ' + row);
+  } else {
+    Logger.log('No calendar event found with recorded ID for row ' + row + '; nothing to remove.');
+  }
+
+  if (fromNotes) {
+    var notes = String(sheet.getRange(row, col.notes).getValue())
+      .replace(/\s*\|?\s*Cal Event ID: [^\s|]+/, '').trim();
+    sheet.getRange(row, col.notes).setValue(notes);
+  } else if (col.eventId) {
+    sheet.getRange(row, col.eventId).setValue('');
+  }
+}
+
 // ── MANUAL SHEET FALLBACK ────────────────────────────────────
-// Setting STATUS to APPROVED by hand in the Sheet still books
-// the calendar. Note: this trigger does NOT fire when the script
-// itself writes APPROVED (Apps Script edits don't trigger
-// onEdit), which is why doGet calls createBookingForRow directly.
+// Setting STATUS by hand in the Sheet still works: APPROVED books
+// the calendar, DENIED removes any existing booking (so denying a
+// previously approved request takes it off the calendar). Note:
+// this trigger does NOT fire when the script itself writes the
+// status (Apps Script edits don't trigger onEdit), which is why
+// doGet calls createBookingForRow directly.
 function onEditHandler(e) {
   var sheet = e.source.getActiveSheet();
   var range = e.range;
@@ -436,12 +475,14 @@ function onEditHandler(e) {
 
   var row = range.getRow();
   var newStatus = String(range.getValue()).toUpperCase().trim();
-  if (newStatus !== 'APPROVED') return;
 
-  // Don't double-book if an event was already created for this row.
-  if (col.eventId && String(sheet.getRange(row, col.eventId).getValue()).trim() !== '') return;
-
-  createBookingForRow(sheet, row, col);
+  if (newStatus === 'APPROVED') {
+    // Don't double-book if an event was already created for this row.
+    if (col.eventId && String(sheet.getRange(row, col.eventId).getValue()).trim() !== '') return;
+    createBookingForRow(sheet, row, col);
+  } else if (newStatus === 'DENIED') {
+    removeBookingForRow(sheet, row, col);
+  }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
