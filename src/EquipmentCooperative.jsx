@@ -104,6 +104,9 @@ async function submitToGoogleForm(formData) {
     let val = formData[key];
     if (typeof val === "boolean") val = val ? "Option 1" : "";
     if (FORM_VALUE_MAP[key] && FORM_VALUE_MAP[key][val]) val = FORM_VALUE_MAP[key][val];
+    // Omit unanswered fields entirely (like a real browser does): an empty
+    // string sent to a dropdown/checkbox question 400s the whole submission.
+    if (String(val).trim() === "") return;
     params.append(fieldId, String(val));
   });
   try {
