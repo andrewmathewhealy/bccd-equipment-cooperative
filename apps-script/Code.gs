@@ -42,6 +42,14 @@ var RECIPIENTS = [
 // Where the confirmation page sends you to create a payment link.
 var STRIPE_DASHBOARD_URL = 'https://dashboard.stripe.com/payment-links';
 
+// The web app's public /exec URL, from Deploy → Manage deployments.
+// This must be hardcoded: ScriptApp.getService().getUrl() returns the
+// login-only /dev URL when called from a trigger, which gives everyone
+// else a Google Drive error page. Update this if the app is ever
+// redeployed under a NEW deployment (a plain "Edit → Version" bump of
+// the existing deployment keeps the same URL).
+var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwS9Evn-CL2yVYbI_2mEPqFlIXvpkKSv4nJMm_u2o31U_7fobmPUWCwdpneUfXjIp2b6A/exec';
+
 // Equipment name (as it appears in the form) → calendar ID.
 // Matching is case-insensitive and ignores punctuation, so minor
 // wording changes on the form won't break it.
@@ -167,7 +175,7 @@ function sendApprovalEmail(sheet, row, col, token) {
   var equipment = get('equipment');
   var dates = formatCell(get('startDate')) + ' to ' + formatCell(get('endDate'));
 
-  var url = ScriptApp.getService().getUrl();
+  var url = WEB_APP_URL || ScriptApp.getService().getUrl();
   if (!url) {
     throw new Error('Web app is not deployed yet. Deploy → New deployment → Web app, then submit again.');
   }
