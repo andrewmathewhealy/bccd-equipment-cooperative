@@ -88,6 +88,14 @@ function useCalendarEvents(equipmentId) {
   return events;
 }
 
+// The Google Form's choice questions (dropdowns/radios) reject the whole
+// submission with a silent 400 if a value isn't one of their exact options,
+// so internal values must be translated to the form's labels before POSTing.
+const FORM_VALUE_MAP = {
+  equipment: { "no-till-drill": "No Till Drill", "bcs-tractor": "BCS Walk-Behind Tractor" },
+  trainingComplete: { completed: "Completed Training", experienced: "Experienced Operator", requires_onsite: "Requires onsite Training" },
+};
+
 async function submitToGoogleForm(formData) {
   if (!GOOGLE_FORM_URL) return { success: true, demo: true };
   const params = new URLSearchParams();
@@ -95,6 +103,7 @@ async function submitToGoogleForm(formData) {
     if (!fieldId || formData[key] === undefined) return;
     let val = formData[key];
     if (typeof val === "boolean") val = val ? "Option 1" : "";
+    if (FORM_VALUE_MAP[key] && FORM_VALUE_MAP[key][val]) val = FORM_VALUE_MAP[key][val];
     params.append(fieldId, String(val));
   });
   try {
