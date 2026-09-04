@@ -9,7 +9,7 @@ const GOOGLE_FORM_FIELDS = {
   name: "entry.288494125", email: "entry.337918862", phone: "entry.1806803604", org: "entry.1958698860",
   personalAddress: "entry.1070875698", address: "entry.343723000", equipment: "entry.579768093",
   trainingComplete: "entry.1866893063", startDate: "entry.1641637150", endDate: "entry.449255813",
-  seedingRecommendation: "entry.1763753377", seedingDepth: "entry.2007546945", seedingSize: "entry.1481004421",
+  seedingRecommendation: "entry.1763753377", seedType: "entry.1747301136", seedingDepth: "entry.2007546945", seedingSize: "entry.1481004421",
   lbPerAcre: "entry.793030339", purpose: "entry.2066471727", fulfillment: "entry.1634875030",
   tractorOperatorPresent: "entry.1343796058", benningtonResident: "entry.606670027",
   certificateOfInsurance: "entry.1391078837", estimatedCost: "entry.1105869624",
@@ -237,12 +237,27 @@ function EquipmentCalendar({ equipmentId }) {
 }
 const calBtn = { background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 16, color: "var(--text)" };
 
+// Collapsed by default so both equipment cards are visible in the
+// website embed without scrolling; the calendar (and its API call)
+// only loads once a visitor opens it.
+function CollapsibleCalendar({ equipmentId }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setOpen(o => !o)} style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 600, color: "var(--accent)", background: "var(--green-bg)", border: "1px solid var(--accent)", borderRadius: 8, padding: "10px 20px", cursor: "pointer" }}>
+        {open ? "▾ Hide Availability Calendar" : "▸ View Availability Calendar"}
+      </button>
+      {open && <div style={{ marginTop: 12 }}><EquipmentCalendar equipmentId={equipmentId} /></div>}
+    </div>
+  );
+}
+
 function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
   const [form, setForm] = useState({
     name: "", email: "", phone: "", org: "", personalAddress: "", equipment: preselectedEquipment || "",
     startDate: "", endDate: "", experience: "", trainingComplete: "",
     purpose: "", acknowledgement: false, fulfillment: "pickup", address: "", benningtonResident: false,
-    certificateOfInsurance: false, seedingRecommendation: "", seedingDepth: "", seedingSize: "", lbPerAcre: "", tractorOperatorPresent: false,
+    certificateOfInsurance: false, seedingRecommendation: "", seedType: "", seedingDepth: "", seedingSize: "", lbPerAcre: "", tractorOperatorPresent: false,
   });
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -462,6 +477,9 @@ function IntakeForm({ onSubmit, onCancel, preselectedEquipment }) {
         {form.equipment === "no-till-drill" && (
           <div style={{ background: "var(--input-bg)", borderRadius: 8, padding: "16px", marginTop: 16, border: "1px solid var(--border)" }}>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Seeding Details</div>
+            <Field label="Seed Type">
+              <input style={inpStyle} value={form.seedType} onChange={e => set("seedType", e.target.value)} placeholder="What are you planting? e.g. winter rye, clover mix" />
+            </Field>
             <Field label="Seeding Recommendation" error={errors.seedingRecommendation}>
               <input style={inpStyle} value={form.seedingRecommendation} onChange={e => set("seedingRecommendation", e.target.value)} placeholder="e.g. NRCS or agronomist recommendation" />
             </Field>
@@ -577,16 +595,10 @@ export default function EquipmentCooperative() {
       fontFamily: "'DM Sans', sans-serif", background: "var(--bg)", minHeight: "100vh", color: "var(--text)",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
-      <div style={{ background: "var(--accent)", color: "white", padding: "24px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 36, margin: 0, fontWeight: 400 }}>Equipment Cooperative</h1>
-          <p style={{ fontSize: 17, opacity: 0.8, margin: "4px 0 0" }}>Bennington County Conservation District</p>
-        </div>
-        <img src="/bccd-logo.jpg" alt="Bennington County Conservation District" style={{ height: 120, borderRadius: 6, background: "white", padding: 2 }} />
-      </div>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
         {view === "browse" && (
           <div>
+            <h1 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 32, fontWeight: 400, color: "var(--text)", margin: "0 0 12px" }}>Equipment Request Form</h1>
             <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "var(--muted)", lineHeight: 1.7, marginBottom: 32, maxWidth: 660 }}>
               Browse available equipment below. Check the calendar for open dates, then submit a rental request. <strong style={{ color: "var(--green)" }}>Free for Bennington County residents</strong> — non-residents pay <strong style={{ color: "var(--text)" }}>$65/day</strong>.<br />Bennington County residents are prioritized.<br />Delivery available at <strong style={{ color: "var(--text)" }}>$40 each way + $1/mile</strong> for both residents and non-residents.
             </p>
@@ -615,7 +627,7 @@ export default function EquipmentCooperative() {
                     </div>
                   </div>
                   <div style={{ padding: "16px 28px 24px" }}>
-                    <EquipmentCalendar equipmentId={eq.id} />
+                    <CollapsibleCalendar equipmentId={eq.id} />
                     <button onClick={() => { setSelectedEquipment(eq.id); setView("form"); }} style={{ ...primaryBtn, marginTop: 20, width: "100%" }}>Request This Equipment</button>
                   </div>
                 </div>
